@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Billing System</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; }
+        .sidebar { position: fixed; left: 0; top: 0; width: 220px; height: 100vh; background: #1e293b; color: #fff; padding: 20px 0; overflow-y: auto; }
+        .sidebar h2 { text-align: center; padding: 10px; margin-bottom: 20px; font-size: 1.1rem; border-bottom: 1px solid #334155; }
+        .sidebar button { display: block; width: 100%; padding: 12px 20px; background: none; border: none; color: #cbd5e1; text-align: left; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
+        .sidebar button:hover, .sidebar button.active { background: #334155; color: #fff; }
+        .sidebar button.active { border-left: 3px solid #3b82f6; }
+        .main { margin-left: 220px; padding: 30px; min-height: 100vh; }
+        .card { background: #fff; border-radius: 8px; padding: 25px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .card h3 { margin-bottom: 15px; color: #1e293b; }
+        .form-row { display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
+        .form-group { flex: 1; min-width: 200px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 500; color: #475569; font-size: 0.85rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 5px; font-size: 0.9rem; }
+        .form-group textarea { height: 80px; resize: vertical; }
+        .btn { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 0.9rem; font-weight: 500; transition: all 0.2s; }
+        .btn-primary { background: #3b82f6; color: #fff; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-success { background: #10b981; color: #fff; }
+        .btn-success:hover { background: #059669; }
+        .btn-danger { background: #ef4444; color: #fff; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-secondary { background: #6b7280; color: #fff; }
+        .btn-secondary:hover { background: #4b5563; }
+        .btn-sm { padding: 5px 12px; font-size: 0.8rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 0.85rem; }
+        th { background: #f8fafc; font-weight: 600; color: #475569; }
+        tr:hover { background: #f8fafc; }
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px; }
+        .stat-card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-align: center; }
+        .stat-card .number { font-size: 1.8rem; font-weight: 700; color: #1e293b; }
+        .stat-card .label { color: #64748b; font-size: 0.85rem; margin-top: 5px; }
+        .stat-card.blue { border-top: 3px solid #3b82f6; }
+        .stat-card.green { border-top: 3px solid #10b981; }
+        .stat-card.red { border-top: 3px solid #ef4444; }
+        .stat-card.orange { border-top: 3px solid #f59e0b; }
+        .hidden { display: none; }
+        .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 15px; }
+        .alert { padding: 12px; border-radius: 5px; margin-bottom: 15px; font-size: 0.85rem; }
+        .alert-success { background: #d1fae5; color: #065f46; }
+        .alert-error { background: #fee2e2; color: #991b1b; }
+        .page-title { font-size: 1.5rem; font-weight: 600; color: #1e293b; margin-bottom: 20px; }
+        .setup-box { max-width: 500px; margin: 80px auto; }
+        .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.7); display: flex; align-items: center; justify-content: center; z-index: 9999; font-size: 1.1rem; color: #475569; }
+        @media print {
+            .sidebar { display: none; }
+            .main { margin-left: 0; padding: 10px; }
+            .btn, .actions, .no-print { display: none !important; }
+            .card { box-shadow: none; border: 1px solid #ddd; }
+        }
+    </style>
+</head>
+<body>
+<div id="app-loading" style="display:flex;align-items:center;justify-content:center;height:100vh;font-size:1.2rem;color:#475569;">Loading...</div>
+
+<script>
+// ===== CONFIGURATION =====
+let API_URL = localStorage.getItem('billing_api_url') || '';
+
+// ===== DATA CACHE =====
+let DATA = { clients: [], invoices: [], payments: [] };
+
+// ===== API LAYER =====
+async function api(action, sheet, body) {
+    const url = new URL(API_URL);
+    url.searchParams.set('action', action);
+    if (sheet) url.searchParams.set('sheet', sheet);
+    const opts = {};
+    if (body) {
+        opts.method = 'POST';
+        opts.headers = { 'Content-Type': 'text/plain' };
+        opts.body = JSON.stringify(body);
+    }
+    const resp = await fetch(url.toString(), opts);
+    return await resp.json();
+}
+
+async function loadAllData() {
+    showLoading(true);
+    try {
+        const [clients, invoices, payments] = await Promise.all([
+            api('getAll', 'Clients'),
+            api('getAll', 'Invoices'),
+            api('getAll', 'Payments')
+        ]);
+        DATA.clients = Array.isArray(clients) ? clients : [];
+        DATA.invoices = Array.isArray(invoices) ? invoices : [];
+        DATA.payments = Array.isArray(payments) ? payments : [];
+    } catch(e) {
+        alert('Error connecting to database: ' + e.message);
+    }
+    showLoading(false);
+}
+
+function showLoading(show) {
+    const el = document.getElementById('loading-overlay');
+    if (el) el.style.display = show ? 'flex' : 'none';
+}
+
+// ===== HELPER FUNCTIONS =====
+function formatCurrency(amount) { return '$' + parseFloat(amount || 0).toFixed(2); }
+function formatDate(d) { if (!d) return ''; const dt = new Date(d); return dt.toLocaleDateString(); }
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+function getClientBalance(clientId) {
+    const totalInv = DATA.invoices.filter(i => i.clientId === clientId).reduce((s, i) => s + parseFloat(i.amount || 0), 0);
+    const totalPaid = DATA.payments.filter(p => p.clientId === clientId).reduce((s, p) => s + parseFloat(p.amount || 0), 0);
+    return totalInv - totalPaid;
+}
+
+function getInvoiceBalance(invoiceId) {
+    const inv = DATA.invoices.find(i => i.id === invoiceId);
+    if (!inv) return 0;
+    const totalPaid = DATA.payments.filter(p => p.invoiceId === invoiceId).reduce((s, p) => s + parseFloat(p.amount || 0), 0);
+    return parseFloat(inv.amount || 0) - totalPaid;
+}
+
+async function getNextInvoiceNumber() {
+    const config = await api('getConfig');
+    const year = new Date().getFullYear();
+    let seq = 1;
+    if (config.invoiceYear == year) {
+        seq = parseInt(config.invoiceSeq || 0) + 1;
+    }
+    await api('setConfig', null, { invoiceYear: year, invoiceSeq: seq });
+    return year + '-' + String(seq).padStart(5, '0');
+}
+
+// ===== APP SHELL =====
+function renderApp() {
+    document.getElementById('app-loading').innerHTML = `
+    <div class="sidebar">
+        <h2>📋 Billing System</h2>
+        <button onclick="showPage('dashboard')" id="nav-dashboard" class="active">📊 Dashboard</button>
+        <button onclick="showPage('clients')" id="nav-clients">👥 Clients</button>
+        <button onclick="showPage('invoices')" id="nav-invoices">📄 Invoices</button>
+        <button onclick="showPage('create-invoice')" id="nav-create-invoice">📝 Create Invoice</button>
+        <button onclick="showPage('payments')" id="nav-payments">💰 Apply Payment</button>
+        <button onclick="showPage('statements')" id="nav-statements">📋 Monthly Statements</button>
+        <button onclick="showPage('past-due')" id="nav-past-due">⚠️ 90-Day Past Due</button>
+        <button onclick="showPage('client-list')" id="nav-client-list">🖨️ Print Client List</button>
+        <button onclick="showPage('client-activity')" id="nav-client-activity">📅 Client Activity</button>
+        <button onclick="showPage('payment-report')" id="nav-payment-report">💵 Payment Report</button>
+        <button onclick="showPage('settings')" id="nav-settings">⚙️ Settings</button>
+    </div>
+    <div class="main" id="main-content"></div>
+    <div id="loading-overlay" class="loading-overlay" style="display:none;">⏳ Working...</div>`;
+    document.getElementById('app-loading').style = '';
+}
+
+function showPage(page) {
+    document.querySelectorAll('.sidebar button').forEach(b => b.classList.remove('active'));
+    const navBtn = document.getElementById('nav-' + page);
+    if (navBtn) navBtn.classList.add('active');
+    const pages = {
+        'dashboard': renderDashboard,
+        'clients': renderClients,
+        'invoices': renderInvoices,
+        'create-invoice': renderCreateInvoice,
+        'payments': renderApplyPayment,
+        'statements': renderStatements,
+        'past-due': renderPastDue,
+        'client-list': renderClientList,
+        'client-activity': renderClientActivity,
+        'payment-report': renderPaymentReport,
+        'settings': renderSettings
+    };
+    if (pages[page]) pages[page]();
+}
+
+// ===== SETUP / SETTINGS =====
+function renderSetup() {
+    document.getElementById('app-loading').innerHTML = `
+    <div class="setup-box card">
+        <h3>⚙️ Billing System Setup</h3>
+        <p style="margin-bottom:15px;color:#64748b;">Enter your Google Apps Script Web App URL to connect to your database.</p>
+        <div class="form-group"><label>Apps Script URL</label><input type="text" id="setupUrl" placeholder="https://script.google.com/macros/s/..."></div>
+        <div class="actions"><button class="btn btn-primary" onclick="saveSetup()">Connect</button></div>
+        <p style="margin-top:15px;font-size:0.8rem;color:#94a3b8;">See SETUP.md for instructions on creating the Google Sheet and deploying the script.</p>
+    </div>`;
+    document.getElementById('app-loading').style = 'display:flex;align-items:center;justify-content:center;height:100vh;';
+}
+
+async function saveSetup() {
+    const url = document.getElementById('setupUrl').value.trim();
+    if (!url) { alert('Please enter the URL.'); return; }
+    API_URL = url;
+    localStorage.setItem('billing_api_url', url);
+    await startApp();
+}
+
+function renderSettings() {
+    document.getElementById('main-content').innerHTML = `
+    <h1 class="page-title">Settings</h1>
+    <div class="card">
+        <div class="form-group"><label>Google Apps Script URL</label><input type="text" id="settingsUrl" value="${API_URL}"></div>
+        <div class="actions">
+            <button class="btn btn-primary" onclick="updateSettings()">Save</button>
+            <button class="btn btn-secondary" onclick="refreshData()">🔄 Refresh Data</button>
+        </div>
+    </div>`;
+}
+
+async function updateSettings() {
+    const url = document.getElementById('settingsUrl').value.trim();
+    if (!url) return;
+    API_URL = url;
+    localStorage.setItem('billing_api_url', url);
+    await loadAllData();
+    alert('Settings saved and data refreshed.');
+}
+
+async function refreshData() {
+    await loadAllData();
+    showPage('dashboard');
+}
+
+// ===== DASHBOARD =====
+function renderDashboard() {
+    const totalInvoiced = DATA.invoices.reduce((s, i) => s + parseFloat(i.amount || 0), 0);
+    const totalPaid = DATA.payments.reduce((s, p) => s + parseFloat(p.amount || 0), 0);
+    const outstanding = totalInvoiced - totalPaid;
+
+    document.getElementById('main-content').innerHTML = `
+        <h1 class="page-title">Dashboard</h1>
+        <div class="dashboard-grid">
+            <div class="stat-card blue"><div class="number">${DATA.clients.length}</div><div class="label">Total Clients</div></div>
+            <div class="stat-card blue"><div class="number">${DATA.invoices.length}</div><div class="label">Total Invoices</div></div>
+            <div class="stat-card green"><div class="number">${formatCurrency(totalPaid)}</div><div class="label">Total Payments Received</div></div>
+            <div class="stat-card red"><div class="number">${formatCurrency(outstanding)}</div><div class="label">Outstanding Balance</div></div>
+        </div>
+        <div class="card">
+            <h3>Recent Invoices</h3>
+            <table><tr><th>Invoice #</th><th>Client</th><th>Date</th><th>Amount</th><th>Balance</th></tr>
+            ${DATA.invoices.slice(-10).reverse().map(i => {
+                const client = DATA.clients.find(c => c.id === i.clientId);
+                return `<tr><td>${i.invoiceNumber}</td><td>${client ? client.name : ''}</td><td>${formatDate(i.date)}</td><td>${formatCurrency(i.amount)}</td><td>${formatCurrency(getInvoiceBalance(i.id))}</td></tr>`;
+            }).join('')}
+            </table>
+        </div>`;
+}
+
+// ===== CLIENTS =====
+function renderClients() {
+    document.getElementById('main-content').innerHTML = `
+        <h1 class="page-title">Clients</h1>
+        <div class="card">
+            <div class="actions no-print" style="margin-bottom:15px;"><button class="btn btn-primary" onclick="renderAddClient()">➕ Add New Client</button></div>
+            <table><tr><th>Name</th><th>Phone</th><th>Email</th><th>Balance</th><th class="no-print">Actions</th></tr>
+            ${DATA.clients.map(c => `<tr>
+                <td>${c.name}</td><td>${c.phone}</td><td>${c.email}</td>
+                <td>${formatCurrency(getClientBalance(c.id))}</td>
+                <td class="no-print"><button class="btn btn-sm btn-primary" onclick="renderAddClient('${c.id}')">Edit</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteClient('${c.id}')">Delete</button></td>
+            </tr>`).join('')}
+            </table>
+        </div>`;
+}
+
+function renderAddClient(editId) {
+    const client = editId ? DATA.clients.find(c => c.id === editId) : null;
+    document.getElementById('main-content').innerHTML = `
+        <h1 class="page-title">${client ? 'Edit' : 'Add'} Client</h1>
+        <div class="card">
+            <div class="form-row">
+                <div class="form-group"><label>Client Name *</label><input type="text" id="clientName" value="${client ? client.name : ''}"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Address</label><textarea id="clientAddress">${client ? client.address : ''}</textarea></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Phone</label><input type="tel" id="clientPhone" value="${client ? client.phone : ''}"></div>
+                <div class="form-group"><label>Email</label><input type="email" id="clientEmail" value="${client ? client.email : ''}"></div>
+            </div>
+            <div class="actions">
+                <button class="btn btn-primary" onclick="saveClient('${editId || ''}')">💾 Save Client</button>
+                <button class="btn btn-secondary" onclick="renderClients()">Cancel</button>
+            </div>
+        </div>`;
+}
+
+async function saveClient(editId) {
+    const name = document.getElementById('clientName').value.trim();
+    if (!name) { alert('Client name is required.'); return; }
+    showLoading(true);
+    const data = {
+        name, address: document.getElementById('clientAddress').value.trim(),
+        phone: document.getElementById('clientPhone').value.trim(),
+        email: document.getElementById('clientEmail').value.trim()
+    };
+    if (editId) {
+        data.id = editId;
+        await api('update', 'Clients', data);
+    } else {
+        data.id = genId();
+        data.createdAt = todayStr();
+        await api('add', 'Clients', data);
+    }
+    await loadAllData();
+    renderClients();
+}
+
+async function deleteClient(id) {
+    if (!confirm('Delete this client? This cannot be undone.')) return;
+    showLoading(true);
+    const url = new URL(API_URL);
+    url.searchParams.set('action', 'delete');
+    url.searchParams.set('sheet', 'Clients');
+    url.searchParams.set('id', id);
+    await fetch(url.toString());
+    await loadAllData();
+    renderClients();
+}
+
+// ===== INVOICES =====
+function renderInvoices() {
+    document.getElementById('main-content').innerHTML = `
+        <h1 class="page-title">Invoices</h1>
+        <div class="card">
+            <div class="actions no-print" style="margin-bottom:15px;"><button class="btn btn-primary" onclick="showPage('create-invoice')">📝 Create Invoice</button></div>
+            <table><tr><th>Invoice #</th><th>Date</th><th>Client</th><th>Servee</th><th>Amount</th><th>Balance</th><th class="no-print">Actions</th></tr>
+            ${DATA.invoices.slice().reverse().map(i => {
+                const client = DATA.clients.find(c => c.id === i.clientId);
+                const bal = getInvoiceBalance(i.id);
+                return `<tr><td>${i.invoiceNumber}</td><td>${formatDate(i.date)}</td><td>${client ? client.name : ''}</td><td>${i.serveeName}</td><td>${formatCurrency(i.amount)}</td>
+                <td style="color:${bal > 0 ? '#ef4444' : '#10b981'}">${formatCurrency(bal)}</td>
+                <td class="no-print"><button class="btn btn-sm btn-primary" onclick="printInvoice('${i.id}')">🖨️</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteInvoice('${i.id}')">Del</button></td></tr>`;
+            }).join('')}
+            </table>
+        </div>`;
+}
+
+function renderCreateInvoice() {
+    document.getElementById('main-content').innerHTML = `
+        <h1 class="page-title">Create Invoice</h1>
+        <div class="card">
+            <div class="form-row">
+                <div class="form-group"><label>Client *</label>
+                    <select id="invClient"><option value="">-- Select Client --</option>
+                    ${DATA.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}</select>
+                </div>
+                <div class="form-group"><label>Invoice Date *</label><input type="date" id="invDate" value="${todayStr()}"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Servee Name *</label><input type="text" id="invServee"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Servee Address</label><textarea id="invServeeAddr"></textarea></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Amount Charged *</label><input type="number" id="invAmount" step="0.01" min="0"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Description / Notes</label><textarea id="invNotes"></textarea></div>
+            </div>
+            <div class="actions">
+                <button class="btn btn-primary" onclick="saveInvoice()">💾 Save Invoice</button>
+                <button class="btn btn-secondary" onclick="showPage('invoices')">Cancel</button>
+            </div>
+        </div>`;
+}
+
+async function saveInvoice() {
+    const clientId = document.getElementById('invClient').value;
+    const date = document.getElementById('invDate').value;
+    const serveeName = document.getElementById('invServee').value.trim();
+    const amount = document.getElementById('invAmount').value;
+    if (!clientId || !date || !serveeName || !amount) { alert('Please fill all required fields.'); return; }
+    showLoading(true);
+    const invoiceNumber = await getNextInvoiceNumber();
+    const data = {
+        id: genId(), invoiceNumber, clientId, date, serveeName,
+        serveeAddress: document.getElementById('invServeeAddr').value.trim(),
+        amount: parseFloat(amount).toFixed(2),
+        notes: document.getElementById('invNotes').value.trim(),
+        createdAt: todayStr()
+    };
+    await api('add', 'Invoices', data);
+    await loadAllData();
+    alert('Invoice ' + invoiceNumber + ' created!');
+    showPage('invoices');
+}
+
+async function deleteInvoice(id) {
+    if (!confirm('Delete this invoice?')) return;
+    showLoading(true);
+    const url = new URL(API_URL);
+    url.searchParams.set('action', 'delete');
+    url.searchParams.set('sheet', 'Invoices');
+    url.searchParams.set('id', id);
+    await fetch(url.toString());
+    await loadAllData();
+    renderInvoices();
+}
+
+function printInvoice(id) {
+    const inv = DATA.invoices.find(i => i.id === id);
+    if (!inv) return;
+    const client = DATA.clients.find(c => c.id === inv.clientId);
+    const bal = getInvoiceBalance(inv.id);
+    document.getElementById('main-content').innerHTML = `
+        <div class="card" style="max-width:700px;margin:auto;">
+            <div style="text-align:center;margin-bottom:20px;"><h2>INVOICE</h2><p style="color:#64748b;">Invoice # ${inv.invoiceNumber}</p></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:20px;">
+                <div><strong>Bill To:</strong><br>${client ? client.name : ''}<br>${client ? (client.address||'').replace(/\n/g,'<br>') : ''}</div>
+                <div style="text-align:right;"><strong>Date:</strong> ${formatDate(inv.date)}<br><strong>Invoice #:</strong> ${inv.invoiceNumber}</div>
+            </div>
+            <div style="margin-bottom:20px;"><strong>Servee:</strong> ${inv.serveeName}<br>${inv.serveeAddress ? inv.serveeAddress.replace(/\n/g,'<br>') : ''}</div>
+            <table><tr><th>Description</th><th style="text-align:right;">Amount</th></tr>
+            <tr><td>${inv.notes || 'Service rendered'}</td><td style="text-align:right;">${formatCurrency(inv.amount)}</td></tr>
+            <tr style="font-weight:bold;border-top:2px solid #000;"><td>Balance Due</td><td style="text-align:right;">${formatCurrency(bal)}</td></tr></table>
+            <div class="actions no-print" style="margin-top:20px;">
+                <button class="btn btn-primary" onclick="window.print()">🖨️ Print</button>
+                <button class="btn btn-secondary" onclick="showPage('invoices')">Back</button>
+            </div>
+        </div>`;
+}
+
+// ===== PAYMENTS =====
+function renderApplyPayment() {
+    document.getElementById('main-content').innerHTML = `
+        <h1 class="page-title">Apply Payment</h1>
+        <div class="card">
+            <div class="form-row">
+                <div class="form-group"><label>Client *</label>
+                    <select id="payClient" onchange="loadClientInvoices()"><option value="">-- Select Client --</option>
+                    ${DATA.clients.map(c => `<option value="${c.id}">${c.name} (Bal: ${formatCurrency(getClientBalance(c.id))})</option>`).join('')}</select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Invoice (optional)</label>
+                    <select id="payInvoice"><option value="">-- General Payment --</option></select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Payment Date *</label><input type="date" id="payDate" value="${todayStr()}"></div>
+                <div class="form-group"><label>Amount *</label><input type="number" id="payAmount" step="0.01" min="0"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Payment Method</label>
+                    <select id="payMethod"><option>Cash</option><option>Check</option><option>Credit Card</option><option>Bank Transfer</option><option>Other</option></select>
+                </div>
+                <div class="form-group"><label>Reference / Check #</label><input type="text" id="payRef"></div>
+            </div>
+            <div class="actions"><button class="btn btn-success" onclick="savePayment()">💰 Apply Payment</button></div>
+        </div>`;
+}
+
+function loadClientInvoices() {
+    const clientId = document.getElementById('payClient').value;
+    const sel = document.getElementById('payInvoice');
+    sel.innerHTML = '<option value="">-- General Payment --</option>';
+    DATA.invoices.filter(i => i.clientId === clientId).forEach(i => {
+        const bal = getInvoiceBalance(i.id);
+        if (bal > 0) sel.innerHTML += `<option value="${i.id}">${i.invoiceNumber} - ${i.serveeName} (Bal: ${formatCurrency(bal)})</option>`;
+    });
+}
+
+async function savePayment() {
+    const clientId = document.getElementById('payClient').value;
+    const date = document.getElementById('payDate').value;
+    const amount = document.getElementById('payAmount').value;
+    if (!clientId || !date || !amount) { alert('Please fill all required fields.'); return; }
+    showLoading(true);
+    const data = {
+        id: genId(), clientId, invoiceId: document.getElementById('payInvoice').value,
+        date, amount: parseFloat(amount).toFixed(2),
+        method: document.getElementById('payMethod').value,
+        reference: document.getElementById('payRef').value.trim(),
+        createdAt: todayStr()
+    };
+    await api('add', 'Payments', data);
+    await loadAllData();
+    alert('Payment applied!');
+    renderApplyPayment();
+}
+
+// ===== MONTHLY STATEMENTS =====
+function renderStatements() {
+    const now = new Date();
+    const monthStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    document.getElementById('main-content').innerHTML = `
+        <h1 class="page-title">Monthly Statements</h1>
+        <div class="card no-print">
+            <div class="form-row">
+                <div class="form-group"><label>Client</label>
+                    <select id="stmtClient"><option value="all">All Clients with Balance</option>
+                    ${DATA.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}</select>
+                </div>
+                <div class="form-group"><label>Statement Month</label><input type="month" id="stmtMonth" value="${monthStr}"></div>
+            </div>
+            <div class="actions"><button class="btn btn-primary" onclick="generateStatements()">📋 Generate</button></div>
+        </div>
+        <div id="statementsOutput"></div>`;
+}
+
+function generateStatements() {
+    const clientId = document.getElementById('stmtClient').value;
+    const month = document.getElementById('stmtMonth').value;
+    let targetClients = clientId === 'all' ? DATA.clients.filter(c => getClientBalance(c.id) > 0) : DATA.clients.filter(c => c.id === clientId);
+    let html = '';
+    targetClients.forEach(client => {
+        const unpaid = DATA.invoices.filter(i => i.clientId === client.id && getInvoiceBalance(i.id) > 0);
+        if (unpaid.length === 0 && clientId === 'all') return;
+        html += `<div class="card" style="page-break-after:always;">
+            <div style="text-align:center;margin-bottom:15px;"><h3>MONTHLY STATEMENT</h3><p style="color:#64748b;">${month}</p></div>
+            <p><strong>${client.name}</strong><br>${client.address ? client.address.replace(/\n/g,'<br>') : ''}</p>
+            <h4 style="margin-top:15px;">Unpaid Invoices</h4>
+            <table><tr><th>Invoice #</th><th>Date</th><th>Servee</th><th>Amount</th><th>Balance Due</th></tr>
+            ${unpaid.map(i => `<tr><td>${i.invoiceNumber}</td><td>${formatDate(i.date)}</td><td>${i.serveeName}</td><td>${formatCurrency(i.amount)}</td><td>${formatCurrency(getInvoiceBalance(i.id))}</td></tr>`).join('')}
+            </table>
+            <p style="margin-top:15px;font-weight:bold;font-size:1.1rem;">Total Balance Due: ${formatCurrency(getClientBalance(client.id))}</p>
+            <div class="actions no-print"><button class="btn btn-primary" onclick="window.print()">🖨️ Print</button></div>
+        </div>`;
+    });
+    if (!html) html = '<div class="card"><p>No outstanding balances found.</p></div>';
+    document.getElementById('statementsOutput').innerHTML = html;
+}
+
+// ===== 90-DAY PAST DUE =====
+function renderPastDue() {
+    const today = new Date();
+    const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() - 90);
+    const pastDue = DATA.invoices.filter(i => {
+        const invDate = new Date(i.date);
+        return invDate <= cutoff && getInvoiceBalance(i.id) > 0;
+    });
+    const totalPastDue = pastDue.reduce((s, i) => s + getInvoiceBalance(i.id), 0);
+    document.getElementById('main-content').innerHTML = `
+        <h1 class="page-title">⚠️ 90-Day Past Due Report</h1>
+        <div class="card">
+            <p style="margin-bottom:10px;"><strong>Total Past Due (90+ days):</strong> <span style="color:#ef4444;font-size:1.2rem;">${formatCurrency(totalPastDue)}</span></p>
+            <table><tr><th>Invoice #</th><th>Client</th><th>Servee</th><th>Date</th><th>Days Past</th><th>Balance</th></tr>
+            ${pastDue.map(i => {
+                const client = DATA.clients.find(c => c.id === i.clientId);
+                const days = Math.floor((today - new Date(i.date)) / (1000*60*60*24));
+                return `<tr><td>${i.invoiceNumber}</td><td>${client ? client.name : ''}</td><td>${i.serveeName}</td><td>${formatDate(i.date)}</td><td style="color:#ef4444;">${days}</td><td>${formatCurrency(getInvoiceBalance(i.id))}</td></tr>`;
+            }).join('')}
+            </table>
+            <div class="actions no-print"><button class="btn btn-primary" onclick="window.print()">🖨️ Print</button></div>
+        </div>`;
+}
+
+// ===== PRINTABLE CLIENT LIST =====
+function renderClientList() {
+    document.getElementById('main-content').innerHTML = `
+        <h1 class="page-title">Client List</h1>
+        <div class="card">
+            <table><tr><th>Name</th><th>Address</th><th>Phone</th><th>Email</th><th>Balance</th></tr>
+            ${DATA.clients.map(c => `<tr><td>${c.name}</td><td>${c.address ? c.address.replace(/\n/g,', ') : ''}</td><td>${c.phone}</td><td>${c.email}</td><td>${formatCurrency(getClientBalance(c.id))}</td></tr>`).join('')}
+            </table>
+            <div class="actions no-print"><button class="btn btn-primary" onclick="window.print()">🖨️ Print</button></div>
+        </div>`;
+}
+
+// ===== CLIENT ACTIVITY =====
+function renderClientActivity() {
+    document.getElementById('main-content').innerHTML = `
+        <h1 class="page-title">Client Activity Report</h1>
+        <div class="card no-print">
+            <div class="form-row">
+                <div class="form-group"><label>Client</label>
+                    <select id="actClient"><option value="all">All Clients</option>
+                    ${DATA.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}</select>
+                </div>
+                <div class="form-group"><label>From Date</label><input type="date" id="actFrom"></div>
+                <div class="form-group"><label>To Date</label><input type="date" id="actTo" value="${todayStr()}"></div>
+            </div>
+            <div class="actions"><button class="btn btn-primary" onclick="generateActivity()">📋 Generate</button></div>
+        </div>
+        <div id="activityOutput"></div>`;
+}
+
+function generateActivity() {
+    const clientId = document.getElementById('actClient').value;
+    const from = document.getElementById('actFrom').value;
+    const to = document.getElementById('actTo').value;
+    let targetClients = clientId === 'all' ? DATA.clients : DATA.clients.filter(c => c.id === clientId);
+    let html = '';
+    targetClients.forEach(client => {
+        let cInv = DATA.invoices.filter(i => i.clientId === client.id);
+        let cPay = DATA.payments.filter(p => p.clientId === client.id);
+        if (from) { cInv = cInv.filter(i => i.date >= from); cPay = cPay.filter(p => p.date >= from); }
+        if (to) { cInv = cInv.filter(i => i.date <= to); cPay = cPay.filter(p => p.date <= to); }
+        if (cInv.length === 0 && cPay.length === 0) return;
+        html += `<div class="card" style="page-break-after:always;">
+            <h3>${client.name}</h3><p style="color:#64748b;margin-bottom:10px;">${from ? formatDate(from) : 'All time'} to ${to ? formatDate(to) : 'Present'}</p>
+            <h4>Invoices</h4>
+            <table><tr><th>Invoice #</th><th>Date</th><th>Servee</th><th>Amount</th></tr>
+            ${cInv.map(i => `<tr><td>${i.invoiceNumber}</td><td>${formatDate(i.date)}</td><td>${i.serveeName}</td><td>${formatCurrency(i.amount)}</td></tr>`).join('')}</table>
+            <h4 style="margin-top:15px;">Payments</h4>
+            <table><tr><th>Date</th><th>Amount</th><th>Method</th><th>Reference</th></tr>
+            ${cPay.map(p => `<tr><td>${formatDate(p.date)}</td><td>${formatCurrency(p.amount)}</td><td>${p.method}</td><td>${p.reference}</td></tr>`).join('')}</table>
+            <p style="margin-top:10px;"><strong>Current Balance: ${formatCurrency(getClientBalance(client.id))}</strong></p>
+        </div>`;
+    });
+    if (!html) html = '<div class="card"><p>No activity found.</p></div>';
+    document.getElementById('activityOutput').innerHTML = html + '<div class="actions no-print"><button class="btn btn-primary" onclick="window.print()">🖨️ Print</button></div>';
+}
+
+// ===== PAYMENT REPORT =====
+function renderPaymentReport() {
+    document.getElementById('main-content').innerHTML = `
+        <h1 class="page-title">Payments Received Report</h1>
+        <div class="card no-print">
+            <div class="form-row">
+                <div class="form-group"><label>Client</label>
+                    <select id="prClient"><option value="all">All Clients</option>
+                    ${DATA.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}</select>
+                </div>
+                <div class="form-group"><label>From Date</label><input type="date" id="prFrom"></div>
+                <div class="form-group"><label>To Date</label><input type="date" id="prTo" value="${todayStr()}"></div>
+            </div>
+            <div class="actions"><button class="btn btn-primary" onclick="generatePaymentReport()">📋 Generate</button></div>
+        </div>
+        <div id="payReportOutput"></div>`;
+}
+
+function generatePaymentReport() {
+    const clientId = document.getElementById('prClient').value;
+    const from = document.getElementById('prFrom').value;
+    const to = document.getElementById('prTo').value;
+    let payments = [...DATA.payments];
+    if (clientId !== 'all') payments = payments.filter(p => p.clientId === clientId);
+    if (from) payments = payments.filter(p => p.date >= from);
+    if (to) payments = payments.filter(p => p.date <= to);
+    const total = payments.reduce((s, p) => s + parseFloat(p.amount || 0), 0);
+    document.getElementById('payReportOutput').innerHTML = `
+        <div class="card">
+            <p><strong>Total Payments:</strong> ${formatCurrency(total)} (${payments.length} payments)</p>
+            <table><tr><th>Date</th><th>Client</th><th>Amount</th><th>Method</th><th>Reference</th><th>Invoice #</th></tr>
+            ${payments.sort((a,b) => a.date.localeCompare(b.date)).map(p => {
+                const client = DATA.clients.find(c => c.id === p.clientId);
+                const inv = DATA.invoices.find(i => i.id === p.invoiceId);
+                return `<tr><td>${formatDate(p.date)}</td><td>${client ? client.name : ''}</td><td>${formatCurrency(p.amount)}</td><td>${p.method}</td><td>${p.reference}</td><td>${inv ? inv.invoiceNumber : 'General'}</td></tr>`;
+            }).join('')}
+            </table>
+            <div class="actions no-print"><button class="btn btn-primary" onclick="window.print()">🖨️ Print</button></div>
+        </div>`;
+}
+
+// ===== APP STARTUP =====
+async function startApp() {
+    if (!API_URL) { renderSetup(); return; }
+    await loadAllData();
+    renderApp();
+    showPage('dashboard');
+}
+
+startApp();
+</script>
+</body>
+</html>
