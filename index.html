@@ -325,11 +325,11 @@ function renderInvoices() {
         <h1 class="page-title">Invoices</h1>
         <div class="card">
             <div class="actions no-print" style="margin-bottom:15px;"><button class="btn btn-primary" onclick="showPage('create-invoice')">📝 Create Invoice</button></div>
-            <table><tr><th>Invoice #</th><th>Date</th><th>Client</th><th>Servee</th><th>Amount</th><th>Balance</th><th class="no-print">Actions</th></tr>
+            <table><tr><th>Invoice #</th><th>Date</th><th>Client</th><th>Servee</th><th>Reference</th><th>Amount</th><th>Balance</th><th class="no-print">Actions</th></tr>
             ${DATA.invoices.slice().reverse().map(i => {
                 const client = DATA.clients.find(c => c.id === i.clientId);
                 const bal = getInvoiceBalance(i.id);
-                return `<tr><td>${i.invoiceNumber}</td><td>${formatDate(i.date)}</td><td>${client ? client.name : ''}</td><td>${i.serveeName}</td><td>${formatCurrency(i.amount)}</td>
+                return `<tr><td>${i.invoiceNumber}</td><td>${formatDate(i.date)}</td><td>${client ? client.name : ''}</td><td>${i.serveeName}</td><td>${i.reference || ''}</td><td>${formatCurrency(i.amount)}</td>
                 <td style="color:${bal > 0 ? '#ef4444' : '#10b981'}">${formatCurrency(bal)}</td>
                 <td class="no-print"><button class="btn btn-sm btn-primary" onclick="printInvoice('${i.id}')">🖨️</button>
                 <button class="btn btn-sm btn-secondary" onclick="editInvoice('${i.id}')">Edit</button>
