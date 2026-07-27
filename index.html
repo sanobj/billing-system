@@ -392,7 +392,6 @@ async function saveInvoice(editId) {
         };
         await api('update', 'Invoices', data);
         await loadAllData();
-        alert('Invoice updated!');
     } else {
         const invoiceNumber = getNextInvoiceNumber();
         const data = {
@@ -404,7 +403,6 @@ async function saveInvoice(editId) {
         };
         await api('add', 'Invoices', data);
         await loadAllData();
-        alert('Invoice ' + invoiceNumber + ' created!');
     }
     showPage('invoices');
 }
