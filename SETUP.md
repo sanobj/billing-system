@@ -16,7 +16,7 @@
    id | invoiceNumber | clientId | date | serveeName | serveeAddress | amount | reference | notes | createdAt
 
 6. In the **Payments** tab, put these headers in Row 1 (A-H):
-   id | clientId | invoiceId | date | amount | method | reference | createdAt
+   id | clientId | invoiceId | date | amount | method | checkNotes | createdAt
 
 ## Step 2: Deploy the Apps Script
 

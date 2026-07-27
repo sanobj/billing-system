@@ -124,7 +124,7 @@ function normalizeKeys(obj) {
             }
         }
         // Ensure string fields are strings (not numbers)
-        if ((normalized === 'amount' || normalized === 'invoiceNumber' || normalized === 'name' || normalized === 'serveeName' || normalized === 'serveeAddress' || normalized === 'reference' || normalized === 'notes' || normalized === 'method' || normalized === 'phone' || normalized === 'email' || normalized === 'address') && val !== null && val !== undefined) {
+        if ((normalized === 'amount' || normalized === 'invoiceNumber' || normalized === 'name' || normalized === 'serveeName' || normalized === 'serveeAddress' || normalized === 'reference' || normalized === 'notes' || normalized === 'method' || normalized === 'phone' || normalized === 'email' || normalized === 'address' || normalized === 'checkNotes') && val !== null && val !== undefined) {
             val = String(val);
         }
         result[normalized] = val;
@@ -518,7 +518,7 @@ function renderApplyPayment(editId) {
                 <div class="form-group"><label>Payment Method</label>
                     <select id="payMethod"><option ${pay && pay.method === 'Cash' ? 'selected' : ''}>Cash</option><option ${pay && pay.method === 'Check' ? 'selected' : ''}>Check</option><option ${pay && pay.method === 'Credit Card' ? 'selected' : ''}>Credit Card</option><option ${pay && pay.method === 'Bank Transfer' ? 'selected' : ''}>Bank Transfer</option><option ${pay && pay.method === 'Other' ? 'selected' : ''}>Other</option></select>
                 </div>
-                <div class="form-group"><label>Reference / Check #</label><input type="text" id="payRef" value="${pay ? pay.reference || '' : ''}"></div>
+                <div class="form-group"><label>Check # / Notes</label><input type="text" id="payRef" value="${pay ? pay.checkNotes || pay.reference || '' : ''}"></div>
             </div>
             <div class="actions">
                 <button class="btn btn-success" onclick="savePayment('${editId || ''}')">\u{1F4B0} ${pay ? 'Update' : 'Apply'} Payment</button>
@@ -527,11 +527,11 @@ function renderApplyPayment(editId) {
         </div>
         <div class="card" style="margin-top:20px;">
             <h3>Payment History</h3>
-            <table><tr><th>Date</th><th>Client</th><th>Amount</th><th>Method</th><th>Reference</th><th>Invoice</th><th class="no-print">Actions</th></tr>
+            <table><tr><th>Date</th><th>Client</th><th>Amount</th><th>Method</th><th>Check # / Notes</th><th>Invoice</th><th>Inv. Reference</th><th class="no-print">Actions</th></tr>
             ${DATA.payments.slice().reverse().map(p => {
                 const client = DATA.clients.find(c => c.id === p.clientId);
                 const inv = DATA.invoices.find(i => i.id === p.invoiceId);
-                return `<tr><td>${formatDate(p.date)}</td><td>${client ? client.name : ''}</td><td>${formatCurrency(p.amount)}</td><td>${p.method}</td><td>${p.reference || ''}</td><td>${inv ? inv.invoiceNumber : 'General'}</td>
+                return `<tr><td>${formatDate(p.date)}</td><td>${client ? client.name : ''}</td><td>${formatCurrency(p.amount)}</td><td>${p.method}</td><td>${p.checkNotes || p.reference || ''}</td><td>${inv ? inv.invoiceNumber : 'General'}</td><td>${inv ? inv.reference || '' : ''}</td>
                 <td class="no-print"><button class="btn btn-sm btn-secondary" onclick="editPayment('${p.id}')">Edit</button>
                 <button class="btn btn-sm btn-danger" onclick="deletePayment('${p.id}')">Del</button></td></tr>`;
             }).join('')}
@@ -569,7 +569,7 @@ async function savePayment(editId) {
             id: editId, clientId, invoiceId: document.getElementById('payInvoice').value,
             date, amount: parseFloat(amount).toFixed(2),
             method: document.getElementById('payMethod').value,
-            reference: document.getElementById('payRef').value.trim(),
+            checkNotes: document.getElementById('payRef').value.trim(),
             createdAt: existing.createdAt
         };
         await api('update', 'Payments', data);
@@ -579,7 +579,7 @@ async function savePayment(editId) {
             id: genId(), clientId, invoiceId: document.getElementById('payInvoice').value,
             date, amount: parseFloat(amount).toFixed(2),
             method: document.getElementById('payMethod').value,
-            reference: document.getElementById('payRef').value.trim(),
+            checkNotes: document.getElementById('payRef').value.trim(),
             createdAt: todayStr()
         };
         await api('add', 'Payments', data);
