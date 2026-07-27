@@ -664,9 +664,9 @@ async function emailStatements() {
     const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     const monthDisplay = monthNames[parseInt(mo) - 1] + ' ' + yr;
     let targetClients = clientId === 'all' ? DATA.clients.filter(c => getClientBalance(c.id) > 0) : DATA.clients.filter(c => c.id === clientId);
-    let emailCount = 0;
-    let errors = [];
-    showLoading(true);
+    
+    // Build list of emails to send
+    const emailQueue = [];
     for (const client of targetClients) {
         if (!client.email) continue;
         const unpaid = DATA.invoices.filter(i => i.clientId === client.id && i.date && i.date.substring(0, 7) <= month && getInvoiceBalance(i.id) > 0);
@@ -680,6 +680,31 @@ async function emailStatements() {
             amount: formatCurrency(i.amount),
             balance: formatCurrency(getInvoiceBalance(i.id))
         }));
+        emailQueue.push({ client, invoices, totalDue, monthDisplay });
+    }
+
+    if (emailQueue.length === 0) {
+        alert('No clients with email addresses and outstanding balances found for the selected month.');
+        return;
+    }
+
+    // Show preview for each email
+    let emailCount = 0;
+    let errors = [];
+    for (const item of emailQueue) {
+        const { client, invoices, totalDue, monthDisplay } = item;
+        let preview = `TO: ${client.email}\nSUBJECT: Monthly Statement - ${monthDisplay} - Willingham Process Service\n\n`;
+        preview += `Client: ${client.name}\n\nUnpaid Invoices:\n`;
+        invoices.forEach(inv => {
+            preview += `  ${inv.invoiceNumber} | ${inv.date} | ${inv.serveeName} | Ref: ${inv.reference} | ${inv.amount} | Balance: ${inv.balance}\n`;
+        });
+        preview += `\nTotal Balance Due: ${totalDue}\n\n`;
+        preview += `—— Send this email? (OK = Send, Cancel = Skip) ——`;
+
+        const send = confirm(preview);
+        if (!send) continue;
+
+        showLoading(true);
         try {
             const result = await api('sendStatement', null, { to: client.email, clientName: client.name, monthDisplay, invoices, totalDue });
             if (result.error) {
@@ -690,14 +715,15 @@ async function emailStatements() {
         } catch(e) {
             errors.push(client.name + ': ' + e.message);
         }
+        showLoading(false);
     }
-    showLoading(false);
+
     if (emailCount > 0) {
         alert(emailCount + ' statement(s) emailed successfully.' + (errors.length ? '\n\nErrors:\n' + errors.join('\n') : ''));
     } else if (errors.length > 0) {
         alert('Failed to send emails:\n' + errors.join('\n'));
     } else {
-        alert('No clients with email addresses and outstanding balances found for the selected month.');
+        alert('No emails were sent.');
     }
 }
 
