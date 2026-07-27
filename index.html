@@ -692,17 +692,17 @@ async function emailStatements() {
             <p style="margin-top:15px;font-weight:bold;font-size:1.1em;">Total Balance Due: ${totalDue}</p>
         </body></html>`;
 
-        // Open print dialog for PDF save
+        // Open mailto in Outlook first
+        const subject = `Monthly Statement - ${monthDisplay} - Willingham Process Service`;
+        const body = `Dear ${client.name},\r\n\r\nPlease find attached your monthly statement for ${monthDisplay}.\r\n\r\nTotal Balance Due: ${totalDue}\r\n\r\nPlease remit payment at your earliest convenience.\r\n\r\nThank you,\r\nNathan Willingham\r\nWillingham Process Service\r\n65 Pine Ave. #418, Long Beach, CA 90802\r\n(714)-350-7775`;
+        const mailto = `mailto:${client.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.open(mailto);
+
+        // Then open statement in new window for Save as PDF
         const printWin = window.open('', '_blank');
         printWin.document.write(statementHtml);
         printWin.document.close();
         printWin.print();
-
-        // Open mailto in Outlook
-        const subject = `Monthly Statement - ${monthDisplay} - Willingham Process Service`;
-        const body = `Dear ${client.name},\r\n\r\nPlease find attached your monthly statement for ${monthDisplay}.\r\n\r\nTotal Balance Due: ${totalDue}\r\n\r\nPlease remit payment at your earliest convenience.\r\n\r\nThank you,\r\nNathan Willingham\r\nWillingham Process Service\r\n65 Pine Ave. #418, Long Beach, CA 90802\r\n(714)-350-7775`;
-        const mailto = `mailto:${client.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        window.location.href = mailto;
         emailCount++;
 
         // If multiple clients, wait before next one
