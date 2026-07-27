@@ -574,7 +574,6 @@ async function savePayment(editId) {
         };
         await api('update', 'Payments', data);
         await loadAllData();
-        alert('Payment updated!');
     } else {
         const data = {
             id: genId(), clientId, invoiceId: document.getElementById('payInvoice').value,
@@ -585,7 +584,6 @@ async function savePayment(editId) {
         };
         await api('add', 'Payments', data);
         await loadAllData();
-        alert('Payment applied!');
     }
     renderApplyPayment();
 }
