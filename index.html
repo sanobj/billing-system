@@ -124,15 +124,14 @@ function getInvoiceBalance(invoiceId) {
     return parseFloat(inv.amount || 0) - totalPaid;
 }
 
-async function getNextInvoiceNumber() {
-    const config = await api('getConfig');
+function getNextInvoiceNumber() {
     const year = new Date().getFullYear();
-    let seq = 1;
-    if (config.invoiceYear == year) {
-        seq = parseInt(config.invoiceSeq || 0) + 1;
-    }
-    await api('setConfig', null, { invoiceYear: year, invoiceSeq: seq });
-    return year + '-' + String(seq).padStart(5, '0');
+    const prefix = year + '-';
+    const thisYearInvoices = DATA.invoices
+        .filter(i => i.invoiceNumber && i.invoiceNumber.startsWith(prefix))
+        .map(i => parseInt(i.invoiceNumber.split('-')[1]) || 0);
+    const maxSeq = thisYearInvoices.length > 0 ? Math.max(...thisYearInvoices) : 0;
+    return prefix + String(maxSeq + 1).padStart(4, '0');
 }
 
 // ===== APP SHELL =====
@@ -376,7 +375,7 @@ async function saveInvoice() {
     const amount = document.getElementById('invAmount').value;
     if (!clientId || !date || !serveeName || !amount) { alert('Please fill all required fields.'); return; }
     showLoading(true);
-    const invoiceNumber = await getNextInvoiceNumber();
+    const invoiceNumber = getNextInvoiceNumber();
     const data = {
         id: genId(), invoiceNumber, clientId, date, serveeName,
         serveeAddress: document.getElementById('invServeeAddr').value.trim(),
