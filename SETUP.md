@@ -12,8 +12,8 @@
 4. In the **Clients** tab, put these headers in Row 1 (one per column A-F):
    id | name | address | phone | email | createdAt
 
-5. In the **Invoices** tab, put these headers in Row 1 (A-I):
-   id | invoiceNumber | clientId | date | serveeName | serveeAddress | amount | notes | createdAt
+5. In the **Invoices** tab, put these headers in Row 1 (A-J):
+   id | invoiceNumber | clientId | date | serveeName | serveeAddress | amount | reference | notes | createdAt
 
 6. In the **Payments** tab, put these headers in Row 1 (A-H):
    id | clientId | invoiceId | date | amount | method | reference | createdAt

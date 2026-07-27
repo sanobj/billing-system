@@ -359,6 +359,7 @@ function renderCreateInvoice(editId) {
             </div>
             <div class="form-row">
                 <div class="form-group"><label>Amount Charged *</label><input type="number" id="invAmount" step="0.01" min="0" value="${inv ? inv.amount : ''}"></div>
+                <div class="form-group"><label>Reference Number</label><input type="text" id="invRef" value="${inv ? inv.reference || '' : ''}"></div>
             </div>
             <div class="form-row">
                 <div class="form-group"><label>Description / Notes</label><textarea id="invNotes">${inv ? inv.notes || '' : ''}</textarea></div>
@@ -387,6 +388,7 @@ async function saveInvoice(editId) {
             id: editId, invoiceNumber: existing.invoiceNumber, clientId, date, serveeName,
             serveeAddress: document.getElementById('invServeeAddr').value.trim(),
             amount: parseFloat(amount).toFixed(2),
+            reference: document.getElementById('invRef').value.trim(),
             notes: document.getElementById('invNotes').value.trim(),
             createdAt: existing.createdAt
         };
@@ -398,6 +400,7 @@ async function saveInvoice(editId) {
             id: genId(), invoiceNumber, clientId, date, serveeName,
             serveeAddress: document.getElementById('invServeeAddr').value.trim(),
             amount: parseFloat(amount).toFixed(2),
+            reference: document.getElementById('invRef').value.trim(),
             notes: document.getElementById('invNotes').value.trim(),
             createdAt: todayStr()
         };
@@ -442,7 +445,7 @@ function printInvoice(id) {
             <div style="margin-bottom:20px;">
                 <strong>Bill To:</strong><br>${client ? client.name : ''}<br>${client ? (client.address||'').replace(/\n/g,'<br>') : ''}
             </div>
-            <div style="margin-bottom:20px;"><strong>Servee:</strong> ${inv.serveeName}<br>${inv.serveeAddress ? inv.serveeAddress.replace(/\n/g,'<br>') : ''}</div>
+            <div style="margin-bottom:20px;"><strong>Servee:</strong> ${inv.serveeName}<br>${inv.serveeAddress ? inv.serveeAddress.replace(/\n/g,'<br>') : ''}${inv.reference ? '<br><strong>Reference #:</strong> ' + inv.reference : ''}</div>
             <table><tr><th>Description</th><th style="text-align:right;">Amount</th></tr>
             <tr><td>${inv.notes || 'Service rendered'}</td><td style="text-align:right;">${formatCurrency(inv.amount)}</td></tr>
             <tr style="font-weight:bold;border-top:2px solid #000;"><td>Balance Due</td><td style="text-align:right;">${formatCurrency(bal)}</td></tr></table>
