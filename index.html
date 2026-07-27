@@ -681,8 +681,12 @@ async function emailStatements() {
             balance: formatCurrency(getInvoiceBalance(i.id))
         }));
         try {
-            await api('sendStatement', null, { to: client.email, clientName: client.name, monthDisplay, invoices, totalDue });
-            emailCount++;
+            const result = await api('sendStatement', null, { to: client.email, clientName: client.name, monthDisplay, invoices, totalDue });
+            if (result.error) {
+                errors.push(client.name + ': ' + result.error);
+            } else {
+                emailCount++;
+            }
         } catch(e) {
             errors.push(client.name + ': ' + e.message);
         }
