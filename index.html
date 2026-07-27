@@ -605,7 +605,7 @@ function generateStatements() {
             <table><tr><th>Invoice #</th><th>Date</th><th>Servee</th><th>Reference</th><th>Amount</th><th>Balance Due</th></tr>
             ${unpaid.map(i => `<tr><td>${i.invoiceNumber}</td><td>${formatDate(i.date)}</td><td>${i.serveeName}</td><td>${i.reference || ''}</td><td>${formatCurrency(i.amount)}</td><td>${formatCurrency(getInvoiceBalance(i.id))}</td></tr>`).join('')}
             </table>
-            <p style="margin-top:15px;font-weight:bold;font-size:1.1rem;">Total Balance Due: ${formatCurrency(getClientBalance(client.id))}</p>
+            <p style="margin-top:15px;font-weight:bold;font-size:1.1rem;">Total Balance Due: ${formatCurrency(unpaid.reduce((s, i) => s + getInvoiceBalance(i.id), 0))}</p>
             <div class="actions no-print"><button class="btn btn-primary" onclick="window.print()">🖨️ Print</button></div>
         </div>`;
     });
