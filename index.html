@@ -664,66 +664,54 @@ async function emailStatements() {
     const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     const monthDisplay = monthNames[parseInt(mo) - 1] + ' ' + yr;
     let targetClients = clientId === 'all' ? DATA.clients.filter(c => getClientBalance(c.id) > 0) : DATA.clients.filter(c => c.id === clientId);
-    
-    // Build list of emails to send
-    const emailQueue = [];
+
+    let emailCount = 0;
     for (const client of targetClients) {
         if (!client.email) continue;
         const unpaid = DATA.invoices.filter(i => i.clientId === client.id && i.date && i.date.substring(0, 7) <= month && getInvoiceBalance(i.id) > 0);
         if (unpaid.length === 0) continue;
         const totalDue = formatCurrency(unpaid.reduce((s, i) => s + getInvoiceBalance(i.id), 0));
-        const invoices = unpaid.map(i => ({
-            invoiceNumber: i.invoiceNumber,
-            date: formatDate(i.date),
-            serveeName: i.serveeName,
-            reference: i.reference || '',
-            amount: formatCurrency(i.amount),
-            balance: formatCurrency(getInvoiceBalance(i.id))
-        }));
-        emailQueue.push({ client, invoices, totalDue, monthDisplay });
-    }
 
-    if (emailQueue.length === 0) {
-        alert('No clients with email addresses and outstanding balances found for the selected month.');
-        return;
-    }
+        // Generate PDF of statement
+        const printedDate = new Date().toLocaleDateString();
+        let statementHtml = `<html><head><style>
+            body{font-family:Arial,sans-serif;padding:30px;max-width:700px;margin:0 auto;}
+            table{width:100%;border-collapse:collapse;margin-top:10px;}
+            th,td{padding:8px;text-align:left;border-bottom:1px solid #ddd;font-size:0.85rem;}
+            th{background:#f5f5f5;font-weight:bold;}
+        </style></head><body>
+            <div style="display:flex;justify-content:space-between;margin-bottom:20px;">
+                <div><strong>Nathan Willingham</strong><br>Willingham Process Service<br>65 Pine Ave. #418, Long Beach, CA 90802<br>(714)-350-7775</div>
+                <div style="text-align:right;"><h2 style="margin:0;">MONTHLY STATEMENT</h2><p>${monthDisplay}</p><p style="font-size:0.8rem;color:#666;">Printed: ${printedDate}</p></div>
+            </div>
+            <p><strong>${client.name}</strong><br>${client.address ? client.address.replace(/\n/g,'<br>') : ''}</p>
+            <h4>Unpaid Invoices</h4>
+            <table><tr><th>Invoice #</th><th>Date</th><th>Servee</th><th>Reference</th><th>Amount</th><th>Balance Due</th></tr>
+            ${unpaid.map(i => `<tr><td>${i.invoiceNumber}</td><td>${formatDate(i.date)}</td><td>${i.serveeName}</td><td>${i.reference || ''}</td><td>${formatCurrency(i.amount)}</td><td>${formatCurrency(getInvoiceBalance(i.id))}</td></tr>`).join('')}
+            </table>
+            <p style="margin-top:15px;font-weight:bold;font-size:1.1em;">Total Balance Due: ${totalDue}</p>
+        </body></html>`;
 
-    // Show preview for each email
-    let emailCount = 0;
-    let errors = [];
-    for (const item of emailQueue) {
-        const { client, invoices, totalDue, monthDisplay } = item;
-        let preview = `TO: ${client.email}\nSUBJECT: Monthly Statement - ${monthDisplay} - Willingham Process Service\n\n`;
-        preview += `Client: ${client.name}\n\nUnpaid Invoices:\n`;
-        invoices.forEach(inv => {
-            preview += `  ${inv.invoiceNumber} | ${inv.date} | ${inv.serveeName} | Ref: ${inv.reference} | ${inv.amount} | Balance: ${inv.balance}\n`;
-        });
-        preview += `\nTotal Balance Due: ${totalDue}\n\n`;
-        preview += `—— Send this email? (OK = Send, Cancel = Skip) ——`;
+        // Open print dialog for PDF save
+        const printWin = window.open('', '_blank');
+        printWin.document.write(statementHtml);
+        printWin.document.close();
+        printWin.print();
 
-        const send = confirm(preview);
-        if (!send) continue;
+        // Open mailto in Outlook
+        const subject = `Monthly Statement - ${monthDisplay} - Willingham Process Service`;
+        const body = `Dear ${client.name},\r\n\r\nPlease find attached your monthly statement for ${monthDisplay}.\r\n\r\nTotal Balance Due: ${totalDue}\r\n\r\nPlease remit payment at your earliest convenience.\r\n\r\nThank you,\r\nNathan Willingham\r\nWillingham Process Service\r\n65 Pine Ave. #418, Long Beach, CA 90802\r\n(714)-350-7775`;
+        const mailto = `mailto:${client.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.location.href = mailto;
+        emailCount++;
 
-        showLoading(true);
-        try {
-            const result = await api('sendStatement', null, { to: client.email, clientName: client.name, monthDisplay, invoices, totalDue });
-            if (result.error) {
-                errors.push(client.name + ': ' + result.error);
-            } else {
-                emailCount++;
-            }
-        } catch(e) {
-            errors.push(client.name + ': ' + e.message);
+        // If multiple clients, wait before next one
+        if (emailCount < targetClients.length) {
+            await new Promise(r => setTimeout(r, 1000));
         }
-        showLoading(false);
     }
-
-    if (emailCount > 0) {
-        alert(emailCount + ' statement(s) emailed successfully.' + (errors.length ? '\n\nErrors:\n' + errors.join('\n') : ''));
-    } else if (errors.length > 0) {
-        alert('Failed to send emails:\n' + errors.join('\n'));
-    } else {
-        alert('No emails were sent.');
+    if (emailCount === 0) {
+        alert('No clients with email addresses and outstanding balances found for the selected month.');
     }
 }
 
