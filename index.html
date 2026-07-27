@@ -177,7 +177,6 @@ function renderApp() {
         <button onclick="showPage('payments')" id="nav-payments">💰 Apply Payment</button>
         <button onclick="showPage('statements')" id="nav-statements">📋 Monthly Statements</button>
         <button onclick="showPage('past-due')" id="nav-past-due">⚠️ 90-Day Past Due</button>
-        <button onclick="showPage('client-list')" id="nav-client-list">🖨️ Print Client List</button>
         <button onclick="showPage('client-activity')" id="nav-client-activity">📅 Client Activity</button>
         <button onclick="showPage('payment-report')" id="nav-payment-report">💵 Payment Report</button>
         <button onclick="showPage('settings')" id="nav-settings">⚙️ Settings</button>
@@ -199,7 +198,6 @@ function showPage(page) {
         'payments': renderApplyPayment,
         'statements': renderStatements,
         'past-due': renderPastDue,
-        'client-list': renderClientList,
         'client-activity': renderClientActivity,
         'payment-report': renderPaymentReport,
         'settings': renderSettings
@@ -284,7 +282,7 @@ function renderClients() {
     document.getElementById('main-content').innerHTML = `
         <h1 class="page-title">Clients</h1>
         <div class="card">
-            <div class="actions no-print" style="margin-bottom:15px;"><button class="btn btn-primary" onclick="renderAddClient()">➕ Add New Client</button></div>
+            <div class="actions no-print" style="margin-bottom:15px;"><button class="btn btn-primary" onclick="renderAddClient()">➕ Add New Client</button><button class="btn btn-secondary" onclick="window.print()" style="margin-left:10px;">🖨️ Print Client List</button></div>
             <table><tr><th>Name</th><th>Phone</th><th>Email</th><th>Balance</th><th class="no-print">Actions</th></tr>
             ${DATA.clients.map(c => `<tr>
                 <td>${c.name}</td><td>${c.phone}</td><td>${c.email}</td>
@@ -614,7 +612,7 @@ function renderStatements() {
                 </div>
                 <div class="form-group"><label>Statement Month</label><input type="month" id="stmtMonth" value="${monthStr}"></div>
             </div>
-            <div class="actions"><button class="btn btn-primary" onclick="generateStatements()">📋 Generate</button></div>
+            <div class="actions"><button class="btn btn-primary" onclick="generateStatements()">📋 Generate</button><button class="btn btn-success" onclick="emailStatements()" style="margin-left:10px;">📧 Email Statements</button></div>
         </div>
         <div id="statementsOutput"></div>`;
 }
@@ -659,6 +657,39 @@ function generateStatements() {
     document.getElementById('statementsOutput').innerHTML = html;
 }
 
+function emailStatements() {
+    const clientId = document.getElementById('stmtClient').value;
+    const month = document.getElementById('stmtMonth').value;
+    const [yr, mo] = month.split('-');
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const monthDisplay = monthNames[parseInt(mo) - 1] + ' ' + yr;
+    let targetClients = clientId === 'all' ? DATA.clients.filter(c => getClientBalance(c.id) > 0) : DATA.clients.filter(c => c.id === clientId);
+    let emailCount = 0;
+    targetClients.forEach(client => {
+        if (!client.email) return;
+        const unpaid = DATA.invoices.filter(i => i.clientId === client.id && i.date && i.date.substring(0, 7) <= month && getInvoiceBalance(i.id) > 0);
+        if (unpaid.length === 0) return;
+        const totalDue = unpaid.reduce((s, i) => s + getInvoiceBalance(i.id), 0);
+        const subject = `Monthly Statement - ${monthDisplay} - Willingham Process Service`;
+        let body = `Dear ${client.name},\n\nPlease find your monthly statement for ${monthDisplay} below.\n\n`;
+        body += `Unpaid Invoices:\n`;
+        body += `${'—'.repeat(50)}\n`;
+        unpaid.forEach(i => {
+            body += `Invoice #${i.invoiceNumber} | ${formatDate(i.date)} | ${i.serveeName}${i.reference ? ' | Ref: ' + i.reference : ''} | Balance: ${formatCurrency(getInvoiceBalance(i.id))}\n`;
+        });
+        body += `${'—'.repeat(50)}\n`;
+        body += `\nTotal Balance Due: ${formatCurrency(totalDue)}\n\n`;
+        body += `Please remit payment at your earliest convenience.\n\n`;
+        body += `Nathan Willingham\nWillingham Process Service\n65 Pine Ave. #418, Long Beach, CA 90802\n(714)-350-7775`;
+        const mailto = `mailto:${client.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.open(mailto);
+        emailCount++;
+    });
+    if (emailCount === 0) {
+        alert('No clients with email addresses and outstanding balances found for the selected month.');
+    }
+}
+
 // ===== 90-DAY PAST DUE =====
 function renderPastDue() {
     const today = new Date();
@@ -678,18 +709,6 @@ function renderPastDue() {
                 const days = Math.floor((today - new Date(i.date)) / (1000*60*60*24));
                 return `<tr><td>${i.invoiceNumber}</td><td>${client ? client.name : ''}</td><td>${i.serveeName}</td><td>${i.reference || ''}</td><td>${formatDate(i.date)}</td><td style="color:#ef4444;">${days}</td><td>${formatCurrency(getInvoiceBalance(i.id))}</td></tr>`;
             }).join('')}
-            </table>
-            <div class="actions no-print"><button class="btn btn-primary" onclick="window.print()">🖨️ Print</button></div>
-        </div>`;
-}
-
-// ===== PRINTABLE CLIENT LIST =====
-function renderClientList() {
-    document.getElementById('main-content').innerHTML = `
-        <h1 class="page-title">Client List</h1>
-        <div class="card">
-            <table><tr><th>Name</th><th>Address</th><th>Phone</th><th>Email</th><th>Balance</th></tr>
-            ${DATA.clients.map(c => `<tr><td>${c.name}</td><td>${c.address ? c.address.replace(/\n/g,', ') : ''}</td><td>${c.phone}</td><td>${c.email}</td><td>${formatCurrency(getClientBalance(c.id))}</td></tr>`).join('')}
             </table>
             <div class="actions no-print"><button class="btn btn-primary" onclick="window.print()">🖨️ Print</button></div>
         </div>`;
