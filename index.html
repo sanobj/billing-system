@@ -623,13 +623,29 @@ function generateStatements() {
     const clientId = document.getElementById('stmtClient').value;
     const month = document.getElementById('stmtMonth').value;
     const monthEnd = month + '-31';
+    const [yr, mo] = month.split('-');
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const monthDisplay = monthNames[parseInt(mo) - 1] + ' ' + yr;
+    const printedDate = new Date().toLocaleDateString();
     let targetClients = clientId === 'all' ? DATA.clients.filter(c => getClientBalance(c.id) > 0) : DATA.clients.filter(c => c.id === clientId);
     let html = '';
     targetClients.forEach(client => {
         const unpaid = DATA.invoices.filter(i => i.clientId === client.id && i.date && i.date.substring(0, 7) <= month && getInvoiceBalance(i.id) > 0);
         if (unpaid.length === 0 && clientId === 'all') return;
         html += `<div class="card" style="page-break-after:always;">
-            <div style="text-align:center;margin-bottom:15px;"><h3>MONTHLY STATEMENT</h3><p style="color:#64748b;">${month}</p></div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:20px;">
+                <div>
+                    <strong>Nathan Willingham</strong><br>
+                    Willingham Process Service<br>
+                    65 Pine Ave. #418, Long Beach, CA 90802<br>
+                    (714)-350-7775
+                </div>
+                <div style="text-align:right;">
+                    <h3 style="margin:0;">MONTHLY STATEMENT</h3>
+                    <p style="color:#64748b;">${monthDisplay}</p>
+                    <p style="font-size:0.8rem;color:#94a3b8;">Printed: ${printedDate}</p>
+                </div>
+            </div>
             <p><strong>${client.name}</strong><br>${client.address ? client.address.replace(/\n/g,'<br>') : ''}</p>
             <h4 style="margin-top:15px;">Unpaid Invoices</h4>
             <table><tr><th>Invoice #</th><th>Date</th><th>Servee</th><th>Reference</th><th>Amount</th><th>Balance Due</th></tr>
