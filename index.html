@@ -408,17 +408,21 @@ function printInvoice(id) {
     const bal = getInvoiceBalance(inv.id);
     document.getElementById('main-content').innerHTML = `
         <div class="card" style="max-width:700px;margin:auto;">
-            <div style="text-align:center;margin-bottom:20px;">
-                <h2>INVOICE</h2>
-                <p><strong>Nathan Willingham</strong></p>
-                <p>Willingham Process Service</p>
-                <p>65 Pine Ave. #418, Long Beach, CA 90802</p>
-                <p>(714)-350-7775</p>
-                <p style="color:#64748b;margin-top:10px;">Invoice # ${inv.invoiceNumber}</p>
-            </div>
             <div style="display:flex;justify-content:space-between;margin-bottom:20px;">
-                <div><strong>Bill To:</strong><br>${client ? client.name : ''}<br>${client ? (client.address||'').replace(/\n/g,'<br>') : ''}</div>
-                <div style="text-align:right;"><strong>Date:</strong> ${formatDate(inv.date)}<br><strong>Invoice #:</strong> ${inv.invoiceNumber}</div>
+                <div>
+                    <strong>Nathan Willingham</strong><br>
+                    Willingham Process Service<br>
+                    65 Pine Ave. #418, Long Beach, CA 90802<br>
+                    (714)-350-7775
+                </div>
+                <div style="text-align:right;">
+                    <h2 style="margin:0;">INVOICE</h2>
+                    <p style="color:#64748b;">Invoice # ${inv.invoiceNumber}</p>
+                    <p><strong>Date:</strong> ${formatDate(inv.date)}</p>
+                </div>
+            </div>
+            <div style="margin-bottom:20px;">
+                <strong>Bill To:</strong><br>${client ? client.name : ''}<br>${client ? (client.address||'').replace(/\n/g,'<br>') : ''}
             </div>
             <div style="margin-bottom:20px;"><strong>Servee:</strong> ${inv.serveeName}<br>${inv.serveeAddress ? inv.serveeAddress.replace(/\n/g,'<br>') : ''}</div>
             <table><tr><th>Description</th><th style="text-align:right;">Amount</th></tr>
