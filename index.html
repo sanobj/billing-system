@@ -332,60 +332,80 @@ function renderInvoices() {
                 return `<tr><td>${i.invoiceNumber}</td><td>${formatDate(i.date)}</td><td>${client ? client.name : ''}</td><td>${i.serveeName}</td><td>${formatCurrency(i.amount)}</td>
                 <td style="color:${bal > 0 ? '#ef4444' : '#10b981'}">${formatCurrency(bal)}</td>
                 <td class="no-print"><button class="btn btn-sm btn-primary" onclick="printInvoice('${i.id}')">🖨️</button>
+                <button class="btn btn-sm btn-secondary" onclick="editInvoice('${i.id}')">Edit</button>
                 <button class="btn btn-sm btn-danger" onclick="deleteInvoice('${i.id}')">Del</button></td></tr>`;
             }).join('')}
             </table>
         </div>`;
 }
 
-function renderCreateInvoice() {
+function renderCreateInvoice(editId) {
+    const inv = editId ? DATA.invoices.find(i => i.id === editId) : null;
     document.getElementById('main-content').innerHTML = `
-        <h1 class="page-title">Create Invoice</h1>
+        <h1 class="page-title">${inv ? 'Edit' : 'Create'} Invoice</h1>
         <div class="card">
             <div class="form-row">
                 <div class="form-group"><label>Client *</label>
                     <select id="invClient"><option value="">-- Select Client --</option>
-                    ${DATA.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}</select>
+                    ${DATA.clients.map(c => `<option value="${c.id}" ${inv && inv.clientId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}</select>
                 </div>
-                <div class="form-group"><label>Invoice Date *</label><input type="date" id="invDate" value="${todayStr()}"></div>
+                <div class="form-group"><label>Invoice Date *</label><input type="date" id="invDate" value="${inv ? inv.date : todayStr()}"></div>
             </div>
             <div class="form-row">
-                <div class="form-group"><label>Servee Name *</label><input type="text" id="invServee"></div>
+                <div class="form-group"><label>Servee Name *</label><input type="text" id="invServee" value="${inv ? inv.serveeName : ''}"></div>
             </div>
             <div class="form-row">
-                <div class="form-group"><label>Servee Address</label><textarea id="invServeeAddr"></textarea></div>
+                <div class="form-group"><label>Servee Address</label><textarea id="invServeeAddr">${inv ? inv.serveeAddress || '' : ''}</textarea></div>
             </div>
             <div class="form-row">
-                <div class="form-group"><label>Amount Charged *</label><input type="number" id="invAmount" step="0.01" min="0"></div>
+                <div class="form-group"><label>Amount Charged *</label><input type="number" id="invAmount" step="0.01" min="0" value="${inv ? inv.amount : ''}"></div>
             </div>
             <div class="form-row">
-                <div class="form-group"><label>Description / Notes</label><textarea id="invNotes"></textarea></div>
+                <div class="form-group"><label>Description / Notes</label><textarea id="invNotes">${inv ? inv.notes || '' : ''}</textarea></div>
             </div>
             <div class="actions">
-                <button class="btn btn-primary" onclick="saveInvoice()">💾 Save Invoice</button>
+                <button class="btn btn-primary" onclick="saveInvoice('${editId || ''}')">\u{1F4BE} ${inv ? 'Update' : 'Save'} Invoice</button>
                 <button class="btn btn-secondary" onclick="showPage('invoices')">Cancel</button>
             </div>
         </div>`;
 }
 
-async function saveInvoice() {
+function editInvoice(id) {
+    renderCreateInvoice(id);
+}
+
+async function saveInvoice(editId) {
     const clientId = document.getElementById('invClient').value;
     const date = document.getElementById('invDate').value;
     const serveeName = document.getElementById('invServee').value.trim();
     const amount = document.getElementById('invAmount').value;
     if (!clientId || !date || !serveeName || !amount) { alert('Please fill all required fields.'); return; }
     showLoading(true);
-    const invoiceNumber = getNextInvoiceNumber();
-    const data = {
-        id: genId(), invoiceNumber, clientId, date, serveeName,
-        serveeAddress: document.getElementById('invServeeAddr').value.trim(),
-        amount: parseFloat(amount).toFixed(2),
-        notes: document.getElementById('invNotes').value.trim(),
-        createdAt: todayStr()
-    };
-    await api('add', 'Invoices', data);
-    await loadAllData();
-    alert('Invoice ' + invoiceNumber + ' created!');
+    if (editId) {
+        const existing = DATA.invoices.find(i => i.id === editId);
+        const data = {
+            id: editId, invoiceNumber: existing.invoiceNumber, clientId, date, serveeName,
+            serveeAddress: document.getElementById('invServeeAddr').value.trim(),
+            amount: parseFloat(amount).toFixed(2),
+            notes: document.getElementById('invNotes').value.trim(),
+            createdAt: existing.createdAt
+        };
+        await api('update', 'Invoices', data);
+        await loadAllData();
+        alert('Invoice updated!');
+    } else {
+        const invoiceNumber = getNextInvoiceNumber();
+        const data = {
+            id: genId(), invoiceNumber, clientId, date, serveeName,
+            serveeAddress: document.getElementById('invServeeAddr').value.trim(),
+            amount: parseFloat(amount).toFixed(2),
+            notes: document.getElementById('invNotes').value.trim(),
+            createdAt: todayStr()
+        };
+        await api('add', 'Invoices', data);
+        await loadAllData();
+        alert('Invoice ' + invoiceNumber + ' created!');
+    }
     showPage('invoices');
 }
 
@@ -436,14 +456,15 @@ function printInvoice(id) {
 }
 
 // ===== PAYMENTS =====
-function renderApplyPayment() {
+function renderApplyPayment(editId) {
+    const pay = editId ? DATA.payments.find(p => p.id === editId) : null;
     document.getElementById('main-content').innerHTML = `
-        <h1 class="page-title">Apply Payment</h1>
+        <h1 class="page-title">${pay ? 'Edit' : 'Apply'} Payment</h1>
         <div class="card">
             <div class="form-row">
                 <div class="form-group"><label>Client *</label>
                     <select id="payClient" onchange="loadClientInvoices()"><option value="">-- Select Client --</option>
-                    ${DATA.clients.map(c => `<option value="${c.id}">${c.name} (Bal: ${formatCurrency(getClientBalance(c.id))})</option>`).join('')}</select>
+                    ${DATA.clients.map(c => `<option value="${c.id}" ${pay && pay.clientId === c.id ? 'selected' : ''}>${c.name} (Bal: ${formatCurrency(getClientBalance(c.id))})</option>`).join('')}</select>
                 </div>
             </div>
             <div class="form-row">
@@ -452,17 +473,40 @@ function renderApplyPayment() {
                 </div>
             </div>
             <div class="form-row">
-                <div class="form-group"><label>Payment Date *</label><input type="date" id="payDate" value="${todayStr()}"></div>
-                <div class="form-group"><label>Amount *</label><input type="number" id="payAmount" step="0.01" min="0"></div>
+                <div class="form-group"><label>Payment Date *</label><input type="date" id="payDate" value="${pay ? pay.date : todayStr()}"></div>
+                <div class="form-group"><label>Amount *</label><input type="number" id="payAmount" step="0.01" min="0" value="${pay ? pay.amount : ''}"></div>
             </div>
             <div class="form-row">
                 <div class="form-group"><label>Payment Method</label>
-                    <select id="payMethod"><option>Cash</option><option>Check</option><option>Credit Card</option><option>Bank Transfer</option><option>Other</option></select>
+                    <select id="payMethod"><option ${pay && pay.method === 'Cash' ? 'selected' : ''}>Cash</option><option ${pay && pay.method === 'Check' ? 'selected' : ''}>Check</option><option ${pay && pay.method === 'Credit Card' ? 'selected' : ''}>Credit Card</option><option ${pay && pay.method === 'Bank Transfer' ? 'selected' : ''}>Bank Transfer</option><option ${pay && pay.method === 'Other' ? 'selected' : ''}>Other</option></select>
                 </div>
-                <div class="form-group"><label>Reference / Check #</label><input type="text" id="payRef"></div>
+                <div class="form-group"><label>Reference / Check #</label><input type="text" id="payRef" value="${pay ? pay.reference || '' : ''}"></div>
             </div>
-            <div class="actions"><button class="btn btn-success" onclick="savePayment()">💰 Apply Payment</button></div>
+            <div class="actions">
+                <button class="btn btn-success" onclick="savePayment('${editId || ''}')">\u{1F4B0} ${pay ? 'Update' : 'Apply'} Payment</button>
+                <button class="btn btn-secondary" onclick="showPage('payments')">Cancel</button>
+            </div>
+        </div>
+        <div class="card" style="margin-top:20px;">
+            <h3>Payment History</h3>
+            <table><tr><th>Date</th><th>Client</th><th>Amount</th><th>Method</th><th>Reference</th><th>Invoice</th><th class="no-print">Actions</th></tr>
+            ${DATA.payments.slice().reverse().map(p => {
+                const client = DATA.clients.find(c => c.id === p.clientId);
+                const inv = DATA.invoices.find(i => i.id === p.invoiceId);
+                return `<tr><td>${formatDate(p.date)}</td><td>${client ? client.name : ''}</td><td>${formatCurrency(p.amount)}</td><td>${p.method}</td><td>${p.reference || ''}</td><td>${inv ? inv.invoiceNumber : 'General'}</td>
+                <td class="no-print"><button class="btn btn-sm btn-secondary" onclick="editPayment('${p.id}')">Edit</button>
+                <button class="btn btn-sm btn-danger" onclick="deletePayment('${p.id}')">Del</button></td></tr>`;
+            }).join('')}
+            </table>
         </div>`;
+    if (pay) {
+        loadClientInvoices();
+        setTimeout(() => { document.getElementById('payInvoice').value = pay.invoiceId || ''; }, 100);
+    }
+}
+
+function editPayment(id) {
+    renderApplyPayment(id);
 }
 
 function loadClientInvoices() {
@@ -475,22 +519,48 @@ function loadClientInvoices() {
     });
 }
 
-async function savePayment() {
+async function savePayment(editId) {
     const clientId = document.getElementById('payClient').value;
     const date = document.getElementById('payDate').value;
     const amount = document.getElementById('payAmount').value;
     if (!clientId || !date || !amount) { alert('Please fill all required fields.'); return; }
     showLoading(true);
-    const data = {
-        id: genId(), clientId, invoiceId: document.getElementById('payInvoice').value,
-        date, amount: parseFloat(amount).toFixed(2),
-        method: document.getElementById('payMethod').value,
-        reference: document.getElementById('payRef').value.trim(),
-        createdAt: todayStr()
-    };
-    await api('add', 'Payments', data);
+    if (editId) {
+        const existing = DATA.payments.find(p => p.id === editId);
+        const data = {
+            id: editId, clientId, invoiceId: document.getElementById('payInvoice').value,
+            date, amount: parseFloat(amount).toFixed(2),
+            method: document.getElementById('payMethod').value,
+            reference: document.getElementById('payRef').value.trim(),
+            createdAt: existing.createdAt
+        };
+        await api('update', 'Payments', data);
+        await loadAllData();
+        alert('Payment updated!');
+    } else {
+        const data = {
+            id: genId(), clientId, invoiceId: document.getElementById('payInvoice').value,
+            date, amount: parseFloat(amount).toFixed(2),
+            method: document.getElementById('payMethod').value,
+            reference: document.getElementById('payRef').value.trim(),
+            createdAt: todayStr()
+        };
+        await api('add', 'Payments', data);
+        await loadAllData();
+        alert('Payment applied!');
+    }
+    renderApplyPayment();
+}
+
+async function deletePayment(id) {
+    if (!confirm('Delete this payment?')) return;
+    showLoading(true);
+    const url = new URL(API_URL);
+    url.searchParams.set('action', 'delete');
+    url.searchParams.set('sheet', 'Payments');
+    url.searchParams.set('id', id);
+    await fetch(url.toString());
     await loadAllData();
-    alert('Payment applied!');
     renderApplyPayment();
 }
 
