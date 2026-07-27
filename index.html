@@ -448,14 +448,12 @@ function printInvoice(id) {
             <div style="margin-bottom:20px;"><strong>Servee:</strong> ${inv.serveeName}<br>${inv.serveeAddress ? inv.serveeAddress.replace(/\n/g,'<br>') : ''}${inv.reference ? '<br><strong>Reference #:</strong> ' + inv.reference : ''}</div>
             <table><tr><th>Description</th><th style="text-align:right;">Amount</th></tr>
             <tr><td>${inv.notes || 'Service rendered'}</td><td style="text-align:right;">${formatCurrency(inv.amount)}</td></tr>
-            <tr style="font-weight:bold;border-top:2px solid #000;"><td>Balance Due</td><td style="text-align:right;">${formatCurrency(bal)}</td></tr></table>
             ${(() => {
                 const invPayments = DATA.payments.filter(p => p.invoiceId === inv.id);
                 if (invPayments.length === 0) return '';
-                return '<h4 style="margin-top:20px;">Payments Received</h4><table><tr><th>Date</th><th>Method</th><th style="text-align:right;">Amount</th></tr>' +
-                    invPayments.map(p => `<tr><td>${formatDate(p.date)}</td><td>${p.method}</td><td style="text-align:right;">${formatCurrency(p.amount)}</td></tr>`).join('') +
-                    '</table>';
+                return invPayments.map(p => `<tr><td>Payment - ${p.method} (${formatDate(p.date)})</td><td style="text-align:right;">-${formatCurrency(p.amount)}</td></tr>`).join('');
             })()}
+            <tr style="font-weight:bold;border-top:2px solid #000;"><td>Balance Due</td><td style="text-align:right;">${formatCurrency(bal)}</td></tr></table>
             <div class="actions no-print" style="margin-top:20px;">
                 <button class="btn btn-primary" onclick="window.print()">🖨️ Print</button>
                 <button class="btn btn-secondary" onclick="showPage('invoices')">Back</button>
