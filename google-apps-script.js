@@ -1,6 +1,12 @@
 // ===== GOOGLE APPS SCRIPT - BILLING SYSTEM API =====
 // Paste this entire file into Extensions > Apps Script in your Google Sheet
 
+// This function forces Gmail permission scope - run it ONCE manually to authorize
+function authorizeEmailPermission() {
+  MailApp.getRemainingDailyQuota();
+  Logger.log('Email permission authorized. Remaining daily quota: ' + MailApp.getRemainingDailyQuota());
+}
+
 const SHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
 
 function doGet(e) {
