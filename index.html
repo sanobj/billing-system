@@ -91,13 +91,37 @@ async function loadAllData() {
             api('getAll', 'Invoices'),
             api('getAll', 'Payments')
         ]);
-        DATA.clients = Array.isArray(clients) ? clients : [];
-        DATA.invoices = Array.isArray(invoices) ? invoices : [];
-        DATA.payments = Array.isArray(payments) ? payments : [];
+        DATA.clients = Array.isArray(clients) ? clients.map(normalizeKeys) : [];
+        DATA.invoices = Array.isArray(invoices) ? invoices.map(normalizeKeys) : [];
+        DATA.payments = Array.isArray(payments) ? payments.map(normalizeKeys) : [];
     } catch(e) {
         alert('Error connecting to database: ' + e.message);
     }
     showLoading(false);
+}
+
+function normalizeKeys(obj) {
+    const result = {};
+    for (const key in obj) {
+        const normalized = key.charAt(0).toLowerCase() + key.slice(1);
+        let val = obj[key];
+        // Normalize date fields from Google Sheets (may come as Date objects or strings)
+        if ((normalized === 'date' || normalized === 'createdAt') && val) {
+            if (val instanceof Date || (typeof val === 'string' && val.includes('T'))) {
+                const d = new Date(val);
+                if (!isNaN(d)) val = d.toISOString().split('T')[0];
+            }
+            // Convert string values to ensure YYYY-MM-DD format
+            if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                // Already correct format
+            } else if (typeof val === 'string' && val) {
+                const d = new Date(val);
+                if (!isNaN(d)) val = d.toISOString().split('T')[0];
+            }
+        }
+        result[normalized] = val;
+    }
+    return result;
 }
 
 function showLoading(show) {
