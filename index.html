@@ -656,11 +656,11 @@ function renderPastDue() {
         <h1 class="page-title">⚠️ 90-Day Past Due Report</h1>
         <div class="card">
             <p style="margin-bottom:10px;"><strong>Total Past Due (90+ days):</strong> <span style="color:#ef4444;font-size:1.2rem;">${formatCurrency(totalPastDue)}</span></p>
-            <table><tr><th>Invoice #</th><th>Client</th><th>Servee</th><th>Date</th><th>Days Past</th><th>Balance</th></tr>
+            <table><tr><th>Invoice #</th><th>Client</th><th>Servee</th><th>Reference</th><th>Date</th><th>Days Past</th><th>Balance</th></tr>
             ${pastDue.map(i => {
                 const client = DATA.clients.find(c => c.id === i.clientId);
                 const days = Math.floor((today - new Date(i.date)) / (1000*60*60*24));
-                return `<tr><td>${i.invoiceNumber}</td><td>${client ? client.name : ''}</td><td>${i.serveeName}</td><td>${formatDate(i.date)}</td><td style="color:#ef4444;">${days}</td><td>${formatCurrency(getInvoiceBalance(i.id))}</td></tr>`;
+                return `<tr><td>${i.invoiceNumber}</td><td>${client ? client.name : ''}</td><td>${i.serveeName}</td><td>${i.reference || ''}</td><td>${formatDate(i.date)}</td><td style="color:#ef4444;">${days}</td><td>${formatCurrency(getInvoiceBalance(i.id))}</td></tr>`;
             }).join('')}
             </table>
             <div class="actions no-print"><button class="btn btn-primary" onclick="window.print()">🖨️ Print</button></div>
