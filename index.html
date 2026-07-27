@@ -601,8 +601,8 @@ function generateStatements() {
             <div style="text-align:center;margin-bottom:15px;"><h3>MONTHLY STATEMENT</h3><p style="color:#64748b;">${month}</p></div>
             <p><strong>${client.name}</strong><br>${client.address ? client.address.replace(/\n/g,'<br>') : ''}</p>
             <h4 style="margin-top:15px;">Unpaid Invoices</h4>
-            <table><tr><th>Invoice #</th><th>Date</th><th>Servee</th><th>Amount</th><th>Balance Due</th></tr>
-            ${unpaid.map(i => `<tr><td>${i.invoiceNumber}</td><td>${formatDate(i.date)}</td><td>${i.serveeName}</td><td>${formatCurrency(i.amount)}</td><td>${formatCurrency(getInvoiceBalance(i.id))}</td></tr>`).join('')}
+            <table><tr><th>Invoice #</th><th>Date</th><th>Servee</th><th>Reference</th><th>Amount</th><th>Balance Due</th></tr>
+            ${unpaid.map(i => `<tr><td>${i.invoiceNumber}</td><td>${formatDate(i.date)}</td><td>${i.serveeName}</td><td>${i.reference || ''}</td><td>${formatCurrency(i.amount)}</td><td>${formatCurrency(getInvoiceBalance(i.id))}</td></tr>`).join('')}
             </table>
             <p style="margin-top:15px;font-weight:bold;font-size:1.1rem;">Total Balance Due: ${formatCurrency(getClientBalance(client.id))}</p>
             <div class="actions no-print"><button class="btn btn-primary" onclick="window.print()">🖨️ Print</button></div>
