@@ -36,6 +36,9 @@ function handleRequest(e) {
       case 'setConfig':
         result = setConfig(JSON.parse(e.postData.contents));
         break;
+      case 'sendStatement':
+        result = sendStatement(JSON.parse(e.postData.contents));
+        break;
       default:
         result = { error: 'Unknown action' };
     }
@@ -143,4 +146,55 @@ function setConfig(data) {
     }
   }
   return { success: true };
+}
+
+function sendStatement(data) {
+  // data: { to, clientName, monthDisplay, invoices: [{invoiceNumber, date, serveeName, reference, amount, balance}], totalDue }
+  const subject = 'Monthly Statement - ' + data.monthDisplay + ' - Willingham Process Service';
+  
+  let invoiceRows = '';
+  data.invoices.forEach(function(inv) {
+    invoiceRows += '<tr>' +
+      '<td style="padding:8px;border-bottom:1px solid #e5e7eb;">' + inv.invoiceNumber + '</td>' +
+      '<td style="padding:8px;border-bottom:1px solid #e5e7eb;">' + inv.date + '</td>' +
+      '<td style="padding:8px;border-bottom:1px solid #e5e7eb;">' + inv.serveeName + '</td>' +
+      '<td style="padding:8px;border-bottom:1px solid #e5e7eb;">' + (inv.reference || '') + '</td>' +
+      '<td style="padding:8px;border-bottom:1px solid #e5e7eb;">' + inv.amount + '</td>' +
+      '<td style="padding:8px;border-bottom:1px solid #e5e7eb;font-weight:bold;">' + inv.balance + '</td>' +
+      '</tr>';
+  });
+
+  const htmlBody = '<div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;">' +
+    '<div style="margin-bottom:20px;">' +
+      '<strong>Nathan Willingham</strong><br>' +
+      'Willingham Process Service<br>' +
+      '65 Pine Ave. #418, Long Beach, CA 90802<br>' +
+      '(714)-350-7775' +
+    '</div>' +
+    '<h2 style="text-align:center;margin-bottom:5px;">MONTHLY STATEMENT</h2>' +
+    '<p style="text-align:center;color:#64748b;margin-bottom:20px;">' + data.monthDisplay + '</p>' +
+    '<p><strong>' + data.clientName + '</strong></p>' +
+    '<h4 style="margin-top:15px;">Unpaid Invoices</h4>' +
+    '<table style="width:100%;border-collapse:collapse;margin-top:10px;">' +
+      '<tr style="background:#f8fafc;">' +
+        '<th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb;">Invoice #</th>' +
+        '<th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb;">Date</th>' +
+        '<th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb;">Servee</th>' +
+        '<th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb;">Reference</th>' +
+        '<th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb;">Amount</th>' +
+        '<th style="padding:8px;text-align:left;border-bottom:2px solid #e5e7eb;">Balance Due</th>' +
+      '</tr>' +
+      invoiceRows +
+    '</table>' +
+    '<p style="margin-top:15px;font-weight:bold;font-size:1.1em;">Total Balance Due: ' + data.totalDue + '</p>' +
+    '<p style="margin-top:20px;color:#64748b;">Please remit payment at your earliest convenience. Thank you for your business.</p>' +
+  '</div>';
+
+  MailApp.sendEmail({
+    to: data.to,
+    subject: subject,
+    htmlBody: htmlBody
+  });
+
+  return { success: true, to: data.to };
 }
